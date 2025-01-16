@@ -1,0 +1,34 @@
+name: ask2receive
+description: A Flutter app for daily affirmations with notifications.
+version: 0.1.0
+
+environment:
+  sdk: ">=3.2.3 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_local_notifications: ^18.0.1
+  shared_preferences: ^2.0.8
+  timezone: ^0.9.4
+  email_launcher: ^1.1.1
+  flutter_email_sender: ^6.0.3
+  flutter_time_picker_spinner: ^2.0.0
+  intl: ^0.18.0
+  provider: ^6.0.2
+
+flutter:
+  assets:
+    - assets/img/galaxy_background.png
+    - assets/data/affirmations.txt
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/Roboto-Regular.ttf
+        - asset: assets/fonts/Roboto-Bold.ttf
+          weight: 700
+
+  # The following line ensures that the Material Icons font is
+  # included with your application, so that you can use the icons in
+  # the material Icons class.
+  uses-material-design: true
