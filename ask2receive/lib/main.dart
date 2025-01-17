@@ -3,25 +3,64 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+import 'package:in_app_purchase/in_app_purchase.dart'; // Add this import
+
 import 'affirmations_list.dart';
 import 'widgets/settings_menu.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(AffirmationApp());
+  ThemeMode savedThemeMode = await loadThemeMode();
+  bool isAdFree = await loadAdFreeStatus(); // Load ad-free status
+  runApp(AffirmationApp(savedThemeMode: savedThemeMode, isAdFree: isAdFree));
+}
+
+Future<ThemeMode> loadThemeMode() async {
+  final prefs = await SharedPreferences.getInstance();
+  int? themeIndex = prefs.getInt('theme_mode');
+  if (themeIndex == null) return ThemeMode.system;
+  return ThemeMode.values[themeIndex];
+}
+
+Future<bool> loadAdFreeStatus() async {
+  final prefs = await SharedPreferences.getInstance();
+  return prefs.getBool('ad_free') ?? false; // Default to false if not set
 }
 
 class AffirmationApp extends StatefulWidget {
+  final ThemeMode savedThemeMode;
+  final bool isAdFree;
+
+  AffirmationApp({required this.savedThemeMode, required this.isAdFree});
+
   @override
   _AffirmationAppState createState() => _AffirmationAppState();
 }
 
 class _AffirmationAppState extends State<AffirmationApp> {
-  ThemeMode _themeMode = ThemeMode.system;
+  late ThemeMode _themeMode;
+  late bool _isAdFree;
 
-  void updateTheme(ThemeMode themeMode) {
+  @override
+  void initState() {
+    super.initState();
+    _themeMode = widget.savedThemeMode;
+    _isAdFree = widget.isAdFree; // Initialize ad-free status
+  }
+
+  void updateTheme(ThemeMode themeMode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('theme_mode', themeMode.index);
     setState(() {
       _themeMode = themeMode;
+    });
+  }
+
+  void toggleAdFree() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('ad_free', !_isAdFree);
+    setState(() {
+      _isAdFree = !_isAdFree;
     });
   }
 
@@ -32,15 +71,23 @@ class _AffirmationAppState extends State<AffirmationApp> {
       themeMode: _themeMode,
       theme: ThemeData.light(),
       darkTheme: ThemeData.dark(),
-      home: AffirmationScreen(updateTheme: updateTheme),
+      home: AffirmationScreen(
+          updateTheme: updateTheme,
+          isAdFree: _isAdFree,
+          toggleAdFree: toggleAdFree),
     );
   }
 }
 
 class AffirmationScreen extends StatefulWidget {
   final Function(ThemeMode) updateTheme;
+  final bool isAdFree; // Add ad-free status
+  final Function() toggleAdFree; // Function to toggle ad-free status
 
-  AffirmationScreen({required this.updateTheme});
+  AffirmationScreen(
+      {required this.updateTheme,
+      required this.isAdFree,
+      required this.toggleAdFree});
 
   @override
   _AffirmationScreenState createState() => _AffirmationScreenState();
@@ -58,7 +105,38 @@ class _AffirmationScreenState extends State<AffirmationScreen> {
     super.initState();
     initializeNotifications();
     selectDailyAffirmation();
-    scheduleNotification();
+    loadNotificationTime(); // Load saved notification time
+    loadUserName(); // Load saved name
+    scheduleDailyNotification();
+  }
+
+  Future<void> loadUserName() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      userName = prefs.getString('user_name');
+    });
+  }
+
+  Future<void> loadNotificationTime() async {
+    final prefs = await SharedPreferences.getInstance();
+    int? savedHour = prefs.getInt('notification_hour');
+    int? savedMinute = prefs.getInt('notification_minute');
+
+    setState(() {
+      if (savedHour != null && savedMinute != null) {
+        notificationTime = TimeOfDay(hour: savedHour, minute: savedMinute);
+      } else {
+        notificationTime = TimeOfDay(hour: 9, minute: 0); // Default 9 AM
+      }
+    });
+
+    scheduleDailyNotification();
+  }
+
+  Future<void> saveNotificationTime(TimeOfDay newTime) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('notification_hour', newTime.hour);
+    await prefs.setInt('notification_minute', newTime.minute);
   }
 
   void initializeNotifications() {
@@ -96,36 +174,51 @@ class _AffirmationScreenState extends State<AffirmationScreen> {
     );
   }
 
-  void scheduleNotification() {
+  void scheduleDailyNotification() async {
+    final prefs = await SharedPreferences.getInstance();
+    int? savedHour = prefs.getInt('notification_hour');
+    int? savedMinute = prefs.getInt('notification_minute');
+
+    if (savedHour == null || savedMinute == null) {
+      return; // No saved notification time, exit function
+    }
+
     final now = DateTime.now();
     final notificationDateTime = DateTime(
       now.year,
       now.month,
       now.day,
-      notificationTime.hour,
-      notificationTime.minute,
-    ).add(
-      now.isAfter(DateTime(now.year, now.month, now.day, notificationTime.hour,
-              notificationTime.minute))
-          ? Duration(days: 1)
-          : Duration.zero,
+      savedHour,
+      savedMinute,
     );
 
-    flutterLocalNotificationsPlugin.zonedSchedule(
+    final scheduledTime = tz.TZDateTime.from(
+      notificationDateTime.isBefore(now)
+          ? notificationDateTime
+              .add(Duration(days: 1)) // Next day if time has passed
+          : notificationDateTime,
+      tz.local,
+    );
+
+    await flutterLocalNotificationsPlugin.zonedSchedule(
       1,
-      'Reminder: Daily Affirmation',
+      'Daily Affirmation',
       dailyAffirmation,
-      tz.TZDateTime.from(notificationDateTime, tz.local),
+      scheduledTime,
       const NotificationDetails(
         android: AndroidNotificationDetails(
           'reminder_channel',
           'Daily Affirmation Reminder',
           channelDescription: 'Reminds you of your daily affirmation.',
+          importance: Importance.high,
+          priority: Priority.high,
         ),
       ),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
+      matchDateTimeComponents:
+          DateTimeComponents.time, // Ensures it repeats daily
     );
   }
 
@@ -191,7 +284,8 @@ class _AffirmationScreenState extends State<AffirmationScreen> {
                     onNotificationTimeChanged: (newTime) {
                       setState(() {
                         notificationTime = newTime;
-                        scheduleNotification();
+                        saveNotificationTime(newTime);
+                        scheduleDailyNotification();
                       });
                     },
                     userName: userName,
@@ -238,8 +332,21 @@ class _AffirmationScreenState extends State<AffirmationScreen> {
                 Padding(
                   padding: const EdgeInsets.only(top: 20),
                   child: Text(
-                    "Hello, $userName!",
+                    "$userName, The Universe is ready to provide! \n\n",
                     style: TextStyle(fontSize: 18, fontStyle: FontStyle.italic),
+                  ),
+                ),
+              if (widget.isAdFree)
+                Container() // Replace with the widget that shows content without ads
+              else
+                Container(
+                  height: 50,
+                  color: Colors.transparent,
+                  child: Center(
+                    child: Text(
+                      "\n\n",
+                      style: TextStyle(color: Colors.white),
+                    ),
                   ),
                 ),
             ],

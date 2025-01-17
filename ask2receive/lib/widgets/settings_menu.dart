@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingsMenu extends StatefulWidget {
   final ThemeMode initialThemeMode;
@@ -34,12 +35,27 @@ class _SettingsMenuState extends State<SettingsMenu> {
     nameController.text = widget.userName ?? "";
   }
 
+  Future<void> saveUserName() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('user_name', nameController.text);
+    widget.onNameChanged(nameController.text);
+
+    // Confirmation message
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Name saved successfully!")),
+    );
+  }
+
+  Future<void> saveThemeMode(ThemeMode themeMode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('theme_mode', themeMode.index);
+    widget.updateTheme(themeMode);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text("Settings"),
-      ),
+      appBar: AppBar(title: Text("Settings")),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -47,14 +63,20 @@ class _SettingsMenuState extends State<SettingsMenu> {
           children: [
             SizedBox(height: 20),
             Text("Enter Your Name", style: TextStyle(fontSize: 18)),
-            TextField(
-              controller: nameController,
-              decoration: InputDecoration(
-                hintText: widget.userName == null ? "Enter your name" : "",
-              ),
-              onSubmitted: (value) {
-                widget.onNameChanged(value);
-              },
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: nameController,
+                    decoration: InputDecoration(hintText: "Enter your name"),
+                  ),
+                ),
+                SizedBox(width: 10),
+                ElevatedButton(
+                  onPressed: saveUserName,
+                  child: Text("Save"),
+                ),
+              ],
             ),
             SizedBox(height: 20),
             Text("Notification Time", style: TextStyle(fontSize: 18)),
@@ -73,29 +95,22 @@ class _SettingsMenuState extends State<SettingsMenu> {
               },
               child: Text("Set Notification Time"),
             ),
+            SizedBox(height: 20),
             Text("Theme", style: TextStyle(fontSize: 18)),
             DropdownButton<ThemeMode>(
               value: selectedThemeMode,
               items: [
+                DropdownMenuItem(value: ThemeMode.light, child: Text("Light")),
+                DropdownMenuItem(value: ThemeMode.dark, child: Text("Dark")),
                 DropdownMenuItem(
-                  value: ThemeMode.light,
-                  child: Text("Light"),
-                ),
-                DropdownMenuItem(
-                  value: ThemeMode.dark,
-                  child: Text("Dark"),
-                ),
-                DropdownMenuItem(
-                  value: ThemeMode.system,
-                  child: Text("System"),
-                ),
+                    value: ThemeMode.system, child: Text("System")),
               ],
-              onChanged: (newThemeMode) {
+              onChanged: (newThemeMode) async {
                 if (newThemeMode != null) {
                   setState(() {
                     selectedThemeMode = newThemeMode;
                   });
-                  widget.updateTheme(newThemeMode);
+                  await saveThemeMode(newThemeMode);
                 }
               },
             ),
