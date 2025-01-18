@@ -1,6 +1,6 @@
 {
-    "name": "vibe_line",
-    "short_name": "vibe_line",
+    "name": "ask2receive",
+    "short_name": "ask2receive",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

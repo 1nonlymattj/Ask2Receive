@@ -1,4 +1,4 @@
-package com.example.vibe_line
+package com.example.ask2receive
 
 import io.flutter.embedding.android.FlutterActivity
 

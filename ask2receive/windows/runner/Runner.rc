@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "vibe_line" "\0"
+            VALUE "FileDescription", "ask2receive" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "vibe_line" "\0"
+            VALUE "InternalName", "ask2receive" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2025 com.example. All rights reserved." "\0"
-            VALUE "OriginalFilename", "vibe_line.exe" "\0"
-            VALUE "ProductName", "vibe_line" "\0"
+            VALUE "OriginalFilename", "ask2receive.exe" "\0"
+            VALUE "ProductName", "ask2receive" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

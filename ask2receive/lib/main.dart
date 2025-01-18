@@ -3,7 +3,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
-import 'package:in_app_purchase/in_app_purchase.dart'; // Add this import
 
 import 'affirmations_list.dart';
 import 'widgets/settings_menu.dart';
@@ -11,8 +10,7 @@ import 'widgets/settings_menu.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   ThemeMode savedThemeMode = await loadThemeMode();
-  bool isAdFree = await loadAdFreeStatus(); // Load ad-free status
-  runApp(AffirmationApp(savedThemeMode: savedThemeMode, isAdFree: isAdFree));
+  runApp(AffirmationApp(savedThemeMode: savedThemeMode));
 }
 
 Future<ThemeMode> loadThemeMode() async {
@@ -22,16 +20,10 @@ Future<ThemeMode> loadThemeMode() async {
   return ThemeMode.values[themeIndex];
 }
 
-Future<bool> loadAdFreeStatus() async {
-  final prefs = await SharedPreferences.getInstance();
-  return prefs.getBool('ad_free') ?? false; // Default to false if not set
-}
-
 class AffirmationApp extends StatefulWidget {
   final ThemeMode savedThemeMode;
-  final bool isAdFree;
 
-  AffirmationApp({required this.savedThemeMode, required this.isAdFree});
+  AffirmationApp({required this.savedThemeMode});
 
   @override
   _AffirmationAppState createState() => _AffirmationAppState();
@@ -39,13 +31,11 @@ class AffirmationApp extends StatefulWidget {
 
 class _AffirmationAppState extends State<AffirmationApp> {
   late ThemeMode _themeMode;
-  late bool _isAdFree;
 
   @override
   void initState() {
     super.initState();
     _themeMode = widget.savedThemeMode;
-    _isAdFree = widget.isAdFree; // Initialize ad-free status
   }
 
   void updateTheme(ThemeMode themeMode) async {
@@ -56,14 +46,6 @@ class _AffirmationAppState extends State<AffirmationApp> {
     });
   }
 
-  void toggleAdFree() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('ad_free', !_isAdFree);
-    setState(() {
-      _isAdFree = !_isAdFree;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -71,23 +53,15 @@ class _AffirmationAppState extends State<AffirmationApp> {
       themeMode: _themeMode,
       theme: ThemeData.light(),
       darkTheme: ThemeData.dark(),
-      home: AffirmationScreen(
-          updateTheme: updateTheme,
-          isAdFree: _isAdFree,
-          toggleAdFree: toggleAdFree),
+      home: AffirmationScreen(updateTheme: updateTheme),
     );
   }
 }
 
 class AffirmationScreen extends StatefulWidget {
   final Function(ThemeMode) updateTheme;
-  final bool isAdFree; // Add ad-free status
-  final Function() toggleAdFree; // Function to toggle ad-free status
 
-  AffirmationScreen(
-      {required this.updateTheme,
-      required this.isAdFree,
-      required this.toggleAdFree});
+  AffirmationScreen({required this.updateTheme});
 
   @override
   _AffirmationScreenState createState() => _AffirmationScreenState();
@@ -332,21 +306,8 @@ class _AffirmationScreenState extends State<AffirmationScreen> {
                 Padding(
                   padding: const EdgeInsets.only(top: 20),
                   child: Text(
-                    "$userName, The Universe is ready to provide! \n\n",
+                    "Hello, $userName!",
                     style: TextStyle(fontSize: 18, fontStyle: FontStyle.italic),
-                  ),
-                ),
-              if (widget.isAdFree)
-                Container() // Replace with the widget that shows content without ads
-              else
-                Container(
-                  height: 50,
-                  color: Colors.transparent,
-                  child: Center(
-                    child: Text(
-                      "\n\n",
-                      style: TextStyle(color: Colors.white),
-                    ),
                   ),
                 ),
             ],
