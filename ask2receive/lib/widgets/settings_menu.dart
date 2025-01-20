@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert';
 
 class SettingsMenu extends StatefulWidget {
   final ThemeMode initialThemeMode;
@@ -60,10 +58,13 @@ class _SettingsMenuState extends State<SettingsMenu> {
 
     // Google Form Response URL with CORS Proxy
     const String googleFormUrl =
-        "https://cors-anywhere.herokuapp.com/https://docs.google.com/forms/d/e/1FAIpQLSdBAF9M10kjB_TnaKz3FHNpI2ZO926wxtSIqfXPKpOT6SzDpA/formResponse";
+        // "https://cors-anywhere.herokuapp.com/https://docs.google.com/forms/d/e/1FAIpQLSdBAF9M10kjB_TnaKz3FHNpI2ZO926wxtSIqfXPKpOT6SzDpA/formResponse";
+        // const String googleFormUrl =
+        "https://cors-anywhere.herokuapp.com/https://docs.google.com/forms/d/e/1FAIpQLSeBAeHbCCiLHVW99lstQhEY7iriZgugz2fh1b-pcJtyzmwlZQ/formResponse";
 
     const String fieldEntryId =
-        "entry.1947812320"; // Field entry ID for the affirmation
+        // "entry.1947812320"; // Field entry ID for the affirmation
+        "entry.1224885230"; // Replace with the actual entry ID
 
     showDialog(
       context: context,
@@ -98,7 +99,8 @@ class _SettingsMenuState extends State<SettingsMenu> {
                       "Content-Type": "application/x-www-form-urlencoded",
                     },
                     body: {
-                      fieldEntryId: affirmationController.text,
+                      fieldEntryId:
+                          affirmationController.text, // Submit user input
                     },
                   );
 
@@ -219,3 +221,63 @@ class _SettingsMenuState extends State<SettingsMenu> {
     );
   }
 }
+
+
+  // void showAffirmationPopup(BuildContext context) {
+  //   TextEditingController affirmationController = TextEditingController();
+
+  //   showDialog(
+  //     context: context,
+  //     builder: (BuildContext context) {
+  //       return AlertDialog(
+  //         title: Text("Submit Affirmation"),
+  //         content: TextField(
+  //           controller: affirmationController,
+  //           maxLength: 200,
+  //           decoration: InputDecoration(hintText: "Enter your affirmation"),
+  //         ),
+  //         actions: [
+  //           TextButton(
+  //             onPressed: () {
+  //               Navigator.of(context).pop(); // Close popup
+  //             },
+  //             child: Text("Cancel"),
+  //           ),
+  //           TextButton(
+  //             onPressed: () async {
+  //               if (affirmationController.text.isEmpty) {
+  //                 ScaffoldMessenger.of(context).showSnackBar(
+  //                   SnackBar(content: Text("Please enter an affirmation")),
+  //                 );
+  //                 return;
+  //               }
+
+  //               String affirmationText =
+  //                   Uri.encodeComponent(affirmationController.text);
+
+  //               // Replace with your Google Form URL & Entry ID
+  //               final String googleFormUrl =
+  //                   "https://docs.google.com/forms/d/e/1FAIpQLSeBAeHbCCiLHVW99lstQhEY7iriZgugz2fh1b-pcJtyzmwlZQ/viewform?usp=pp_url&entry.1224885230=$affirmationText";
+  //               // Replace `entry.1234567890` with your Google Form Entry ID
+
+  //               if (await canLaunchUrl(Uri.parse(googleFormUrl))) {
+  //                 await launchUrl(Uri.parse(googleFormUrl),
+  //                     mode: LaunchMode.externalApplication);
+  //               } else {
+  //                 ScaffoldMessenger.of(context).showSnackBar(
+  //                   SnackBar(
+  //                     content: Text("Could not open Google Form."),
+  //                     duration: Duration(seconds: 3),
+  //                   ),
+  //                 );
+  //               }
+
+  //               Navigator.of(context).pop();
+  //             },
+  //             child: Text("Submit"),
+  //           ),
+  //         ],
+  //       );
+  //     },
+  //   );
+  // }

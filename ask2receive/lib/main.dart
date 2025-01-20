@@ -306,7 +306,7 @@ class _AffirmationScreenState extends State<AffirmationScreen> {
                 Padding(
                   padding: const EdgeInsets.only(top: 20),
                   child: Text(
-                    "Hello, $userName!",
+                    "$userName The Universe is ready to Listen!",
                     style: TextStyle(fontSize: 18, fontStyle: FontStyle.italic),
                   ),
                 ),

@@ -12,7 +12,6 @@ dependencies:
   shared_preferences: ^2.0.8
   timezone: ^0.9.4
   http: ^1.2.2
-  email_launcher: ^1.1.1
   url_launcher: ^6.1.14
   flutter_email_sender: ^6.0.3
   flutter_time_picker_spinner: ^2.0.0
