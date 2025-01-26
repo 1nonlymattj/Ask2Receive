@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+import 'package:url_launcher/url_launcher.dart';
 
 import 'affirmations_list.dart';
 import 'widgets/settings_menu.dart';
@@ -16,8 +18,9 @@ Future<void> main() async {
 Future<ThemeMode> loadThemeMode() async {
   final prefs = await SharedPreferences.getInstance();
   int? themeIndex = prefs.getInt('theme_mode');
-  if (themeIndex == null) return ThemeMode.system;
-  return ThemeMode.values[themeIndex];
+
+  // Handle null case and provide a default value (ThemeMode.system)
+  return ThemeMode.values[themeIndex ?? 0]; // Default to index 0 if null
 }
 
 class AffirmationApp extends StatefulWidget {
@@ -81,7 +84,14 @@ class _AffirmationScreenState extends State<AffirmationScreen> {
     selectDailyAffirmation();
     loadNotificationTime(); // Load saved notification time
     loadUserName(); // Load saved name
+    requestNotificationPermissions();
     scheduleDailyNotification();
+  }
+
+  Future<void> requestNotificationPermissions() async {
+    if (await Permission.notification.isDenied) {
+      await Permission.notification.request();
+    }
   }
 
   Future<void> loadUserName() async {
@@ -97,11 +107,11 @@ class _AffirmationScreenState extends State<AffirmationScreen> {
     int? savedMinute = prefs.getInt('notification_minute');
 
     setState(() {
-      if (savedHour != null && savedMinute != null) {
-        notificationTime = TimeOfDay(hour: savedHour, minute: savedMinute);
-      } else {
-        notificationTime = TimeOfDay(hour: 9, minute: 0); // Default 9 AM
-      }
+      // Use default values (e.g., 9 and 0) if savedHour or savedMinute is null
+      notificationTime = TimeOfDay(
+        hour: savedHour ?? 9, // Default to 9 if savedHour is null
+        minute: savedMinute ?? 0, // Default to 0 if savedMinute is null
+      );
     });
 
     scheduleDailyNotification();
@@ -113,49 +123,47 @@ class _AffirmationScreenState extends State<AffirmationScreen> {
     await prefs.setInt('notification_minute', newTime.minute);
   }
 
-  void initializeNotifications() {
+  void initializeNotifications() async {
     tz.initializeTimeZones();
+
+    const DarwinInitializationSettings initializationSettingsIOS =
+        DarwinInitializationSettings(
+      requestSoundPermission: true,
+      requestBadgePermission: true,
+      requestAlertPermission: true,
+    );
+
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
+
     final InitializationSettings initializationSettings =
         InitializationSettings(
+      iOS: initializationSettingsIOS,
       android: initializationSettingsAndroid,
     );
-    flutterLocalNotificationsPlugin.initialize(initializationSettings);
+
+    await flutterLocalNotificationsPlugin.initialize(initializationSettings);
   }
 
-  void selectDailyAffirmation() {
+  void selectDailyAffirmation() async {
+    final prefs = await SharedPreferences.getInstance();
     final now = DateTime.now();
-    final nextMidnight = DateTime(now.year, now.month, now.day + 1);
-    setState(() {
-      dailyAffirmation = affirmations[now.day % affirmations.length];
-    });
-    flutterLocalNotificationsPlugin.zonedSchedule(
-      0,
-      'Daily Affirmation',
-      dailyAffirmation,
-      tz.TZDateTime.from(nextMidnight, tz.local),
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'daily_affirmation_channel',
-          'Daily Affirmations',
-          channelDescription: 'Receive a daily affirmation at midnight.',
-        ),
-      ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-    );
+    final lastUpdated = prefs.getString('last_affirmation_date');
+
+    if (lastUpdated == null ||
+        lastUpdated != "${now.year}-${now.month}-${now.day}") {
+      setState(() {
+        dailyAffirmation = affirmations[now.day % affirmations.length];
+      });
+      await prefs.setString(
+          'last_affirmation_date', "${now.year}-${now.month}-${now.day}");
+    }
   }
 
   void scheduleDailyNotification() async {
     final prefs = await SharedPreferences.getInstance();
-    int? savedHour = prefs.getInt('notification_hour');
-    int? savedMinute = prefs.getInt('notification_minute');
-
-    if (savedHour == null || savedMinute == null) {
-      return; // No saved notification time, exit function
-    }
+    int savedHour = prefs.getInt('notification_hour') ?? 9;
+    int savedMinute = prefs.getInt('notification_minute') ?? 0;
 
     final now = DateTime.now();
     final notificationDateTime = DateTime(
@@ -169,7 +177,7 @@ class _AffirmationScreenState extends State<AffirmationScreen> {
     final scheduledTime = tz.TZDateTime.from(
       notificationDateTime.isBefore(now)
           ? notificationDateTime
-              .add(Duration(days: 1)) // Next day if time has passed
+              .add(Duration(days: 1)) // Move to next day if time has passed
           : notificationDateTime,
       tz.local,
     );
@@ -191,8 +199,7 @@ class _AffirmationScreenState extends State<AffirmationScreen> {
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents:
-          DateTimeComponents.time, // Ensures it repeats daily
+      matchDateTimeComponents: DateTimeComponents.time,
     );
   }
 

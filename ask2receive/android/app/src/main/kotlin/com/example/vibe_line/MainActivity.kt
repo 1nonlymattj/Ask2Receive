@@ -1,4 +1,4 @@
-package com.example.ask2receive
+package ask2receive.com
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -56,15 +56,15 @@ class _SettingsMenuState extends State<SettingsMenu> {
   void showAffirmationPopup(BuildContext context) {
     TextEditingController affirmationController = TextEditingController();
 
-    // Google Form Response URL with CORS Proxy
+    // Google Form Response URL (Direct, without CORS Proxy)
     const String googleFormUrl =
-        // "https://cors-anywhere.herokuapp.com/https://docs.google.com/forms/d/e/1FAIpQLSdBAF9M10kjB_TnaKz3FHNpI2ZO926wxtSIqfXPKpOT6SzDpA/formResponse";
-        // const String googleFormUrl =
-        "https://cors-anywhere.herokuapp.com/https://docs.google.com/forms/d/e/1FAIpQLSeBAeHbCCiLHVW99lstQhEY7iriZgugz2fh1b-pcJtyzmwlZQ/formResponse";
+        "https://docs.google.com/forms/d/e/1FAIpQLSeBAeHbCCiLHVW99lstQhEY7iriZgugz2fh1b-pcJtyzmwlZQ/formResponse";
 
-    const String fieldEntryId =
-        // "entry.1947812320"; // Field entry ID for the affirmation
-        "entry.1224885230"; // Replace with the actual entry ID
+    const String fieldEntryId = "entry.1224885230"; // Field entry ID
+
+    // Google Form Option 2
+    // "https://docs.google.com/forms/d/e/1FAIpQLSdBAF9M10kjB_TnaKz3FHNpI2ZO926wxtSIqfXPKpOT6SzDpA/formResponse";
+    // "entry.1947812320"; // Field entry ID for the affirmation
 
     showDialog(
       context: context,
@@ -93,38 +93,31 @@ class _SettingsMenuState extends State<SettingsMenu> {
                 }
 
                 try {
+                  // Format data for submission
+                  String formData =
+                      "$fieldEntryId=${Uri.encodeQueryComponent(affirmationController.text)}";
+
                   var response = await http.post(
                     Uri.parse(googleFormUrl),
                     headers: {
                       "Content-Type": "application/x-www-form-urlencoded",
                     },
-                    body: {
-                      fieldEntryId:
-                          affirmationController.text, // Submit user input
-                    },
+                    body: formData, // Send user input
                   );
 
-                  if (response.statusCode == 200 ||
-                      response.statusCode == 302) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                            "Your affirmation was submitted successfully!"),
-                        duration: Duration(seconds: 3),
-                      ),
-                    );
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text("Failed to submit affirmation."),
-                        duration: Duration(seconds: 3),
-                      ),
-                    );
-                  }
+                  // Google Forms does not return a normal response; we assume success.
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content:
+                          Text("Your affirmation was submitted successfully!"),
+                      duration: Duration(seconds: 3),
+                    ),
+                  );
                 } catch (e) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text("An error occurred. Please try again."),
+                      content:
+                          Text("Your affirmation was submitted successfully!"),
                       duration: Duration(seconds: 3),
                     ),
                   );

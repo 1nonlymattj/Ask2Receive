@@ -8,7 +8,7 @@
 PRODUCT_NAME = ask2receive
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.example.vibeLine
+PRODUCT_BUNDLE_IDENTIFIER = ask2receive.com.vibeLine
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2025 com.example. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright © 2025 ask2receive.com. All rights reserved.
