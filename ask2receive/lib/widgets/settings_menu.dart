@@ -172,6 +172,12 @@ class _SettingsMenuState extends State<SettingsMenu> {
                     notificationTime = pickedTime;
                   });
                   widget.onNotificationTimeChanged(pickedTime);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text("Notification time has been updated!"),
+                      duration: Duration(seconds: 3),
+                    ),
+                  );
                 }
               },
               child: Text("Set Notification Time"),

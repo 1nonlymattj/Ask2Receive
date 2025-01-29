@@ -89,7 +89,8 @@ class _AffirmationScreenState extends State<AffirmationScreen> {
   }
 
   Future<void> requestNotificationPermissions() async {
-    if (await Permission.notification.isDenied) {
+    var status = await Permission.notification.status;
+    if (status.isDenied || status.isPermanentlyDenied) {
       await Permission.notification.request();
     }
   }
@@ -149,12 +150,19 @@ class _AffirmationScreenState extends State<AffirmationScreen> {
     final prefs = await SharedPreferences.getInstance();
     final now = DateTime.now();
     final lastUpdated = prefs.getString('last_affirmation_date');
+    final savedAffirmation = prefs.getString('daily_affirmation');
 
-    if (lastUpdated == null ||
-        lastUpdated != "${now.year}-${now.month}-${now.day}") {
+    if (lastUpdated == "${now.year}-${now.month}-${now.day}" &&
+        savedAffirmation != null) {
       setState(() {
-        dailyAffirmation = affirmations[now.day % affirmations.length];
+        dailyAffirmation = savedAffirmation;
       });
+    } else {
+      final newAffirmation = affirmations[now.day % affirmations.length];
+      setState(() {
+        dailyAffirmation = newAffirmation;
+      });
+      await prefs.setString('daily_affirmation', newAffirmation);
       await prefs.setString(
           'last_affirmation_date', "${now.year}-${now.month}-${now.day}");
     }
@@ -164,6 +172,8 @@ class _AffirmationScreenState extends State<AffirmationScreen> {
     final prefs = await SharedPreferences.getInstance();
     int savedHour = prefs.getInt('notification_hour') ?? 9;
     int savedMinute = prefs.getInt('notification_minute') ?? 0;
+    String savedAffirmation =
+        prefs.getString('daily_affirmation') ?? "Stay positive!";
 
     final now = DateTime.now();
     final notificationDateTime = DateTime(
@@ -185,7 +195,7 @@ class _AffirmationScreenState extends State<AffirmationScreen> {
     await flutterLocalNotificationsPlugin.zonedSchedule(
       1,
       'Daily Affirmation',
-      dailyAffirmation,
+      savedAffirmation,
       scheduledTime,
       const NotificationDetails(
         android: AndroidNotificationDetails(
