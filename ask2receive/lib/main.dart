@@ -170,38 +170,62 @@ class _AffirmationScreenState extends State<AffirmationScreen> {
 
   void scheduleDailyNotification() async {
     final prefs = await SharedPreferences.getInstance();
-    int savedHour = prefs.getInt('notification_hour') ?? 9;
-    int savedMinute = prefs.getInt('notification_minute') ?? 0;
-    String savedAffirmation =
-        prefs.getString('daily_affirmation') ?? "Stay positive!";
 
-    final now = DateTime.now();
-    final notificationDateTime = DateTime(
-      now.year,
-      now.month,
-      now.day,
-      savedHour,
-      savedMinute,
-    );
+    // **9 AM Notification (Fixed Time)**
+    final dailyAffirmationTime = DateTime(
+        DateTime.now().year, DateTime.now().month, DateTime.now().day, 9, 0);
 
-    final scheduledTime = tz.TZDateTime.from(
-      notificationDateTime.isBefore(now)
-          ? notificationDateTime
-              .add(Duration(days: 1)) // Move to next day if time has passed
-          : notificationDateTime,
+    final tz.TZDateTime scheduledAffirmationTime = tz.TZDateTime.from(
+      dailyAffirmationTime.isBefore(DateTime.now())
+          ? dailyAffirmationTime.add(Duration(days: 1))
+          : dailyAffirmationTime,
       tz.local,
     );
 
     await flutterLocalNotificationsPlugin.zonedSchedule(
       1,
-      'Daily Affirmation',
-      savedAffirmation,
-      scheduledTime,
+      "Daily Affirmation",
+      "Your Daily Affirmation has arrived",
+      scheduledAffirmationTime,
       const NotificationDetails(
         android: AndroidNotificationDetails(
-          'reminder_channel',
-          'Daily Affirmation Reminder',
-          channelDescription: 'Reminds you of your daily affirmation.',
+          'daily_affirmation_channel',
+          'Daily Affirmation',
+          channelDescription: 'Sends a daily affirmation at 9 AM',
+          importance: Importance.high,
+          priority: Priority.high,
+        ),
+      ),
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+      matchDateTimeComponents: DateTimeComponents.time,
+    );
+
+    // **User-Specified Time Notification**
+    int savedHour = prefs.getInt('notification_hour') ?? 18; // Default: 6 PM
+    int savedMinute = prefs.getInt('notification_minute') ?? 0;
+
+    final userNotificationTime = DateTime(DateTime.now().year,
+        DateTime.now().month, DateTime.now().day, savedHour, savedMinute);
+
+    final tz.TZDateTime scheduledUserTime = tz.TZDateTime.from(
+      userNotificationTime.isBefore(DateTime.now())
+          ? userNotificationTime.add(Duration(days: 1))
+          : userNotificationTime,
+      tz.local,
+    );
+
+    await flutterLocalNotificationsPlugin.zonedSchedule(
+      2,
+      "Visualization Reminder",
+      "Time to visualize your affirmation",
+      scheduledUserTime,
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'visualization_channel',
+          'Visualization Reminder',
+          channelDescription: 'Reminds you to visualize your affirmation',
           importance: Importance.high,
           priority: Priority.high,
         ),
@@ -276,9 +300,11 @@ class _AffirmationScreenState extends State<AffirmationScreen> {
                       setState(() {
                         notificationTime = newTime;
                         saveNotificationTime(newTime);
-                        scheduleDailyNotification();
+                        scheduleDailyNotification(); // ✅ Pass the function here
                       });
                     },
+                    scheduleNotificationCallback:
+                        scheduleDailyNotification, // ✅ Pass the function
                     userName: userName,
                     onNameChanged: (newName) {
                       setState(() {

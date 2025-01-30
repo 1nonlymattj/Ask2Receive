@@ -8,6 +8,7 @@ class SettingsMenu extends StatefulWidget {
   final Function(TimeOfDay) onNotificationTimeChanged;
   final Function(String) onNameChanged;
   final Function(ThemeMode) updateTheme;
+  final Function scheduleNotificationCallback;
   final String? userName;
 
   SettingsMenu({
@@ -16,6 +17,7 @@ class SettingsMenu extends StatefulWidget {
     required this.onNotificationTimeChanged,
     required this.onNameChanged,
     required this.updateTheme,
+    required this.scheduleNotificationCallback,
     this.userName,
   });
 
@@ -26,6 +28,13 @@ class SettingsMenu extends StatefulWidget {
 class _SettingsMenuState extends State<SettingsMenu> {
   late ThemeMode selectedThemeMode;
   late TimeOfDay notificationTime;
+  String toCamelCase(String name) {
+    return name.split(' ').map((word) {
+      if (word.isEmpty) return '';
+      return word[0].toUpperCase() + word.substring(1).toLowerCase();
+    }).join(' ');
+  }
+
   TextEditingController nameController = TextEditingController();
 
   @override
@@ -38,8 +47,17 @@ class _SettingsMenuState extends State<SettingsMenu> {
 
   Future<void> saveUserName() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('user_name', nameController.text);
-    widget.onNameChanged(nameController.text);
+
+    String formattedName =
+        toCamelCase(nameController.text); // Convert to Camel Case
+
+    await prefs.setString('user_name', formattedName);
+    widget.onNameChanged(formattedName);
+
+    // Update UI with formatted name
+    setState(() {
+      nameController.text = formattedName;
+    });
 
     // Confirmation message
     ScaffoldMessenger.of(context).showSnackBar(
@@ -167,11 +185,20 @@ class _SettingsMenuState extends State<SettingsMenu> {
                   context: context,
                   initialTime: notificationTime,
                 );
+
                 if (pickedTime != null) {
                   setState(() {
                     notificationTime = pickedTime;
                   });
+
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setInt('notification_hour', pickedTime.hour);
+                  await prefs.setInt('notification_minute', pickedTime.minute);
+
                   widget.onNotificationTimeChanged(pickedTime);
+                  widget.scheduleNotificationCallback(); // Reschedule new time
+
+                  // Show confirmation message for 3 seconds
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text("Notification time has been updated!"),
