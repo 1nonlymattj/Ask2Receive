@@ -2,9 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:timezone/data/latest.dart' as tz;
+import 'dart:convert'; // ✅ Add this to fix the error
+import 'package:http/http.dart' as http;
+import 'package:geolocator/geolocator.dart';
+import 'package:timezone/standalone.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:permission_handler/permission_handler.dart';
 
 import 'affirmations_list.dart';
 import 'widgets/settings_menu.dart';
@@ -85,13 +92,26 @@ class _AffirmationScreenState extends State<AffirmationScreen> {
     loadNotificationTime(); // Load saved notification time
     loadUserName(); // Load saved name
     requestNotificationPermissions();
+    print("✅ initState() called, attempting to schedule notification...");
     scheduleDailyNotification();
   }
 
   Future<void> requestNotificationPermissions() async {
+    if (kIsWeb) {
+      print("🛑 Notifications are not supported on web.");
+      return;
+    }
+
     var status = await Permission.notification.status;
     if (status.isDenied || status.isPermanentlyDenied) {
       await Permission.notification.request();
+    }
+
+    // Request exact alarm permission ONLY on Android (not web/iOS)
+    if (Platform.isAndroid) {
+      if (await Permission.scheduleExactAlarm.isDenied) {
+        await Permission.scheduleExactAlarm.request();
+      }
     }
   }
 
@@ -124,23 +144,23 @@ class _AffirmationScreenState extends State<AffirmationScreen> {
     await prefs.setInt('notification_minute', newTime.minute);
   }
 
-  void initializeNotifications() async {
-    tz.initializeTimeZones();
+  Future<void> initializeNotifications() async {
+    tzdata.initializeTimeZones();
 
-    const DarwinInitializationSettings initializationSettingsIOS =
-        DarwinInitializationSettings(
-      requestSoundPermission: true,
-      requestBadgePermission: true,
-      requestAlertPermission: true,
-    );
-
-    const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+    String? userTimezone = await getUserTimeZone();
+    if (userTimezone != null) {
+      tz.setLocalLocation(tz.getLocation(userTimezone));
+      print("🌍 Timezone set to: $userTimezone");
+    } else {
+      tz.setLocalLocation(
+          tz.getLocation('America/Chicago')); // Default fallback
+      print("⚠️ Using default timezone: America/Chicago");
+    }
 
     final InitializationSettings initializationSettings =
         InitializationSettings(
-      iOS: initializationSettingsIOS,
-      android: initializationSettingsAndroid,
+      android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+      iOS: DarwinInitializationSettings(),
     );
 
     await flutterLocalNotificationsPlugin.initialize(initializationSettings);
@@ -168,59 +188,69 @@ class _AffirmationScreenState extends State<AffirmationScreen> {
     }
   }
 
-  void scheduleDailyNotification() async {
+  Future<void> scheduleDailyNotification(
+      {bool updateUserReminderOnly = false}) async {
     final prefs = await SharedPreferences.getInstance();
+    tzdata.initializeTimeZones();
 
-    // **9 AM Notification (Fixed Time)**
-    final dailyAffirmationTime = DateTime(
-        DateTime.now().year, DateTime.now().month, DateTime.now().day, 9, 0);
+    // 🔍 Get user timezone
+    String? userTimezone = await getUserTimeZone();
+    if (userTimezone != null) {
+      tz.setLocalLocation(tz.getLocation(userTimezone));
+      print("🌍 Timezone set to: $userTimezone");
+    } else {
+      tz.setLocalLocation(
+          tz.getLocation('America/Chicago')); // Default fallback
+      print("⚠️ Using default timezone: America/Chicago");
+    }
 
-    final tz.TZDateTime scheduledAffirmationTime = tz.TZDateTime.from(
-      dailyAffirmationTime.isBefore(DateTime.now())
-          ? dailyAffirmationTime.add(Duration(days: 1))
-          : dailyAffirmationTime,
-      tz.local,
-    );
+    final now = tz.TZDateTime.now(tz.local);
 
-    await flutterLocalNotificationsPlugin.zonedSchedule(
-      1,
-      "Daily Affirmation",
-      "Your Daily Affirmation has arrived",
-      scheduledAffirmationTime,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'daily_affirmation_channel',
-          'Daily Affirmation',
-          channelDescription: 'Sends a daily affirmation at 9 AM',
-          importance: Importance.high,
-          priority: Priority.high,
+    // 📅 9 AM Daily Affirmation Notification (Only schedule if it's not updateUserReminderOnly)
+    if (!updateUserReminderOnly) {
+      final tz.TZDateTime dailyAffirmationTime =
+          tz.TZDateTime(tz.local, now.year, now.month, now.day, 9, 0);
+
+      await flutterLocalNotificationsPlugin.zonedSchedule(
+        1,
+        "Daily Affirmation",
+        "Your Daily Affirmation has arrived!",
+        dailyAffirmationTime.isBefore(now)
+            ? dailyAffirmationTime
+                .add(Duration(days: 1)) // Ensure it's in the future
+            : dailyAffirmationTime,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'daily_affirmation_channel',
+            'Daily Affirmation',
+            channelDescription: 'Sends a daily affirmation at 9 AM',
+            importance: Importance.high,
+            priority: Priority.high,
+          ),
         ),
-      ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.time,
-    );
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.time,
+      );
 
-    // **User-Specified Time Notification**
+      print("📅 Scheduled Daily Affirmation at: $dailyAffirmationTime");
+    }
+
+    // 📅 User-Specified Visualization Reminder
     int savedHour = prefs.getInt('notification_hour') ?? 18; // Default: 6 PM
     int savedMinute = prefs.getInt('notification_minute') ?? 0;
 
-    final userNotificationTime = DateTime(DateTime.now().year,
-        DateTime.now().month, DateTime.now().day, savedHour, savedMinute);
-
-    final tz.TZDateTime scheduledUserTime = tz.TZDateTime.from(
-      userNotificationTime.isBefore(DateTime.now())
-          ? userNotificationTime.add(Duration(days: 1))
-          : userNotificationTime,
-      tz.local,
-    );
+    final tz.TZDateTime visualizationReminderTime = tz.TZDateTime(
+        tz.local, now.year, now.month, now.day, savedHour, savedMinute);
 
     await flutterLocalNotificationsPlugin.zonedSchedule(
       2,
       "Visualization Reminder",
       "Time to visualize your affirmation",
-      scheduledUserTime,
+      visualizationReminderTime.isBefore(now)
+          ? visualizationReminderTime.add(Duration(days: 1))
+          : visualizationReminderTime,
       const NotificationDetails(
         android: AndroidNotificationDetails(
           'visualization_channel',
@@ -235,6 +265,56 @@ class _AffirmationScreenState extends State<AffirmationScreen> {
           UILocalNotificationDateInterpretation.absoluteTime,
       matchDateTimeComponents: DateTimeComponents.time,
     );
+
+    print("📅 Scheduled Visualization Reminder at: $visualizationReminderTime");
+  }
+
+  Future<String?> getUserTimeZone() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    // 🛰️ Check if GPS is enabled
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      print("❌ Location services are disabled.");
+      return null;
+    }
+
+    // 📍 Check for location permission
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        print("❌ Location permissions denied.");
+        return null;
+      }
+    }
+
+    Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high);
+
+    double latitude = position.latitude;
+    double longitude = position.longitude;
+    print("📍 User Location: $latitude, $longitude");
+
+    // 🌍 Fetch timezone from API
+    final url = Uri.parse(
+        "http://api.timezonedb.com/v2.1/get-time-zone?key=YOUR_API_KEY&format=json&by=position&lat=$latitude&lng=$longitude");
+
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        print("🕒 Timezone found: ${data['zoneName']}");
+        return data['zoneName']; // Example: "America/New_York"
+      } else {
+        print("❌ Timezone API Error: ${response.body}");
+        return null;
+      }
+    } catch (e) {
+      print("❌ Failed to fetch timezone: $e");
+      return null;
+    }
   }
 
   void showWriteAffirmationPopup() {
@@ -300,7 +380,9 @@ class _AffirmationScreenState extends State<AffirmationScreen> {
                       setState(() {
                         notificationTime = newTime;
                         saveNotificationTime(newTime);
-                        scheduleDailyNotification(); // ✅ Pass the function here
+                        scheduleDailyNotification(
+                            updateUserReminderOnly:
+                                true); // ✅ Only update user reminder
                       });
                     },
                     scheduleNotificationCallback:
